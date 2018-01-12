@@ -1,0 +1,401 @@
+<html>
+
+<head>
+	<script src = "https://d3js.org/d3.v3.min.js"></script>
+  <style>
+
+    .axis { font: 14px sans-serif; }
+
+    .axis path, .axis line {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+  }
+
+    .dot {
+    stroke: #000;
+    fill : #273746;
+    }
+    .line{
+    stroke:#273746;
+    stroke-width:2px;
+    }
+
+    div.tooltip { 
+    position: absolute;     
+    text-align: center;     
+    width: 70px;          
+    height: 48px;         
+    padding: 2px;       
+    font: 12px sans-serif;    
+    background: lightsteelblue; 
+    border: 0px;    
+    border-radius: 8px;     
+    pointer-events: none;     
+}
+
+  </style>
+</head>
+
+<body></body>
+
+<script>
+
+  function drawGraph1()
+  {
+
+  var height = 400;
+  var width = 400;
+  var margin =
+  {
+    left : 80,
+    right : 40,
+    top : 40,
+    bottom : 30
+  };
+
+    var svg = d3.select('body').append('svg')
+              .attr('width',width + margin.left+margin.right)
+              .attr('height',height+margin.top+margin.bottom)
+              .append('g')
+              .attr('transform','translate('+margin.left+','+margin.top+')');
+
+    svg.append("text")
+        .text("States with higher literacy rates have lower poverty percentages")
+        .style("font","14px sans-serif");
+
+
+
+    var div = d3.select("body").append("div") 
+    .attr("class", "tooltip")       
+    .style("opacity", 0);
+
+    var x = d3.scale.linear()
+            .range([0,width]);
+  	var y = d3.scale.linear()
+            .range([height,0]);
+  
+    //Literacy Rate
+  	var xAxis = d3.svg.axis()
+		.scale(x)
+		.orient("bottom");
+
+  //Poverty percentage
+	var yAxis = d3.svg.axis()
+		.scale(y)
+		.orient("left");
+
+	d3.json("{% url "pov_data" %}",function(data){
+
+		console.log(data);
+
+    data.forEach(function(d)
+    {
+      d.literacy_rate = +d.literacy_rate;
+      d.percent_below_pov_line = +d.percent_below_pov_line;
+      d.pop_increase = +d.pop_increase;
+    })
+
+    max_x_value = d3.max(data,function(d) { return d.literacy_rate; });
+    max_y_value = d3.max(data,function(d) { return d.percent_below_pov_line; });
+    
+    console.log(max_x_value);
+    console.log(max_y_value);
+
+    x.domain([0,150]);
+    y.domain([0,90]);
+
+    //x axis
+    svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+      .append("text")
+        .attr("class", "label")
+        .attr("x", width)
+        .attr("y", -6)
+        .style("text-anchor", "end")
+        .text("Literacy Rate(%)");
+
+    //y axis
+    svg.append("g")
+      .attr("class", "y axis")
+      //.attr("transform", "translate("+margin.left+ ",0)")
+      .call(yAxis)
+      .append("text")
+        .attr("class", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Poverty(%)");
+
+
+    svg.selectAll(".dot")
+      .data(data.slice(1))
+      .enter()
+      .append("circle")
+      .attr("class", "dot")
+      .attr("opacity",0.5)
+      .attr("r",5)
+      .attr("cx", function(d) { return x(d.literacy_rate); })
+      .attr("cy", function(d) { return y(d.percent_below_pov_line); })
+      .style("fill","#273746")
+      .style("stroke"," lightgrey" ).style("stroke-width","1px")
+      .on("mouseover", function(d) {    
+            div.transition()    
+                .duration(200)    
+                .style("opacity", .9);    
+            div .html(d.state)  
+                .style("left", (d3.event.pageX) + "px")   
+                .style("top", (d3.event.pageY - 28) + "px");  
+            })          
+        .on("mouseout", function(d) {   
+            div.transition()    
+                .duration(500)    
+                .style("opacity", 0); 
+        });
+
+        
+
+      //Calculate b1(slope)
+      var mean_x = d3.mean(data.slice(1),function(d){ return d.literacy_rate; });
+      var mean_y = d3.mean(data.slice(1),function(d){ return d.percent_below_pov_line; });
+      var numerator = d3.sum(data.slice(1),function(d){ 
+
+                return ((d.literacy_rate - mean_x)*(d.percent_below_pov_line - mean_y))
+
+      });
+
+      var denominator = d3.sum(data.slice(1),function(d){ 
+
+                return Math.pow((d.literacy_rate - mean_x),2)
+
+      });
+
+      var b1 = numerator/denominator;
+
+      var b0 = mean_y - (b1*mean_x);
+
+      function yval(x)
+      {
+        return x*b1 + b0;
+      }
+
+
+      console.log(mean_x,mean_y,numerator,denominator,b1,b0);
+
+      var regline = d3.svg.line()
+      .x(function(d){
+      return x(d.literacy_rate);
+      })
+
+      .y(function(d){
+      return y(yval(d.literacy_rate));
+      });
+
+      var path = svg.append("path")
+      .attr("d", regline(data.slice(1)))
+      .attr("class","line");
+
+
+
+
+
+	});
+
+}
+
+function drawGraph2()
+{
+    var height = 400;
+  var width = 400;
+  var margin =
+  {
+    left : 80,
+    right : 40,
+    top : 40,
+    bottom : 30
+  };
+
+    var svg = d3.select('body').append('svg')
+              .attr('width',width + margin.left+margin.right)
+              .attr('height',height+margin.top+margin.bottom)
+              .append('g')
+              .attr('transform','translate('+margin.left+','+margin.top+')');
+
+    svg.append("text")
+        .text("States with higher populations have higher poverty percentages")
+        .style("font","14px sans-serif");
+
+
+
+    var div = d3.select("body").append("div") 
+    .attr("class", "tooltip")       
+    .style("opacity", 0);
+
+    var x = d3.scale.linear()
+            .range([0,width]);
+    var y = d3.scale.linear()
+            .range([height,0]);
+  
+    //Population Density
+    var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+  //Poverty percentage
+  var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+    function scaleBetween(unscaledNum, minAllowed, maxAllowed, min, max) {
+  return (maxAllowed - minAllowed) * (unscaledNum - min) / (max - min) + minAllowed;
+}
+
+  d3.json("{% url "pov_data" %}",function(data){
+
+    console.log(data);
+
+    data.forEach(function(d)
+    {
+      d.percent_below_pov_line = +d.percent_below_pov_line;
+      d.population = +d.population;
+    })
+
+    new_data = data.slice(1);
+
+    min_value = d3.min(new_data,function(d) { return d.population; });
+    max_value = d3.max(new_data,function(d) { return d.population; });
+
+    console.log(min_value,max_value);
+
+    
+    //Normalize population to a value 0-100
+    new_data.forEach(function(d)
+    {
+
+      var unscaled = d.population;
+      var scaled = scaleBetween(unscaled, 0, 100, min_value, max_value);
+      console.log(scaled.toFixed(2));
+      d.population = scaled;
+
+    });
+
+    /*max_x_value = d3.max(data,function(d) { return d.literacy_rate; });
+    max_y_value = d3.max(data,function(d) { return d.percent_below_pov_line; });
+    
+    console.log(max_x_value);
+    console.log(max_y_value);*/
+
+    x.domain([0,50]);
+    y.domain([0,90]);
+
+    //x axis
+    svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+      .append("text")
+        .attr("class", "label")
+        .attr("x", width)
+        .attr("y", -6)
+        .style("text-anchor", "end")
+        .text("Population");
+
+    //y axis
+    svg.append("g")
+      .attr("class", "y axis")
+      //.attr("transform", "translate("+margin.left+ ",0)")
+      .call(yAxis)
+      .append("text")
+        .attr("class", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Poverty(%)");
+
+
+    svg.selectAll(".dot")
+      .data(data.slice(1))
+      .enter()
+      .append("circle")
+      .attr("class", "dot")
+      .attr("opacity",0.5)
+      .attr("r",5)
+      .attr("cx", function(d) { return x(d.population); })
+      .attr("cy", function(d) { return y(d.percent_below_pov_line); })
+      .style("fill","#273746")
+      .style("stroke"," lightgrey" ).style("stroke-width","1px")
+      .on("mouseover", function(d) {    
+            div.transition()    
+                .duration(200)    
+                .style("opacity", .9);    
+            div .html(d.state)  
+                .style("left", (d3.event.pageX) + "px")   
+                .style("top", (d3.event.pageY - 28) + "px");  
+            })          
+        .on("mouseout", function(d) {   
+            div.transition()    
+                .duration(500)    
+                .style("opacity", 0); 
+        });
+
+        
+
+      //Calculate b1(slope)
+      var mean_x = d3.mean(data.slice(1),function(d){ return d.population; });
+      var mean_y = d3.mean(data.slice(1),function(d){ return d.percent_below_pov_line; });
+      var numerator = d3.sum(data.slice(1),function(d){ 
+
+                return ((d.population - mean_x)*(d.percent_below_pov_line - mean_y))
+
+      });
+
+      var denominator = d3.sum(data.slice(1),function(d){ 
+
+                return Math.pow((d.population - mean_x),2)
+
+      });
+
+      var b1 = numerator/denominator;
+
+      var b0 = mean_y - (b1*mean_x);
+
+      function yval(x)
+      {
+        return x*b1 + b0;
+      }
+
+
+      console.log(mean_x,mean_y,numerator,denominator,b1,b0);
+
+      var regline = d3.svg.line()
+      .x(function(d){
+      return x(d.population);
+      })
+
+      .y(function(d){
+      return y(yval(d.population));
+      });
+
+      var path = svg.append("path")
+      .attr("d", regline(data.slice(1)))
+      .attr("class","line");
+
+
+
+
+
+  });
+
+}
+
+  drawGraph1();
+  drawGraph2();
+
+
+
+</script>
+</html>
